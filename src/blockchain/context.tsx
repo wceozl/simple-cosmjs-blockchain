@@ -6,6 +6,7 @@ import { Transaction } from './models';
 export interface Wallet {
   address: string;
   balance: number;
+  availableBalance?: number; // 添加可用余额字段
 }
 
 // 区块链上下文接口
@@ -45,7 +46,8 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     
     const newWallet: Wallet = {
       address: newAddress,
-      balance: 0
+      balance: 0,
+      availableBalance: 0
     };
     
     setWallets(prev => [...prev, newWallet]);
@@ -66,10 +68,16 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // 刷新所有钱包余额
   const refreshBalances = () => {
-    const updatedWallets = wallets.map(wallet => ({
-      ...wallet,
-      balance: blockchain.getBalanceOfAddress(wallet.address)
-    }));
+    const updatedWallets = wallets.map(wallet => {
+      const confirmedBalance = blockchain.getBalanceOfAddress(wallet.address);
+      const availableBalance = blockchain.getAvailableBalance(wallet.address);
+      
+      return {
+        ...wallet,
+        balance: confirmedBalance,
+        availableBalance: availableBalance
+      };
+    });
     
     setWallets(updatedWallets);
     
@@ -101,6 +109,8 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     
     if (success) {
       console.log(`交易创建成功: ${currentWallet.address} -> ${to} (${amount})`);
+      // 创建交易成功后刷新余额
+      refreshBalances();
     } else {
       console.log('交易创建失败');
     }
