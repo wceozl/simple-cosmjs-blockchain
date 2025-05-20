@@ -50,15 +50,26 @@ export class Blockchain {
 
   // 添加待处理交易
   public addTransaction(transaction: Transaction): boolean {
-    // 这里可以添加更多的交易验证逻辑
+    // 基本验证：地址有效、金额大于0
     if (!transaction.from || !transaction.to || transaction.amount <= 0) {
       return false;
     }
 
-    // 验证发送方余额是否足够
-    const senderBalance = this.getBalanceOfAddress(transaction.from);
-    if (senderBalance < transaction.amount) {
-      console.log('交易失败: 余额不足');
+    // 计算已确认的余额
+    const confirmedBalance = this.getBalanceOfAddress(transaction.from);
+    
+    // 计算待处理交易中的支出
+    let pendingSpent = 0;
+    for (const tx of this.pendingTransactions) {
+      if (tx.from === transaction.from) {
+        pendingSpent += tx.amount;
+      }
+    }
+    
+    // 验证余额是否足够，考虑待处理交易的支出
+    const availableBalance = confirmedBalance - pendingSpent;
+    if (availableBalance < transaction.amount) {
+      console.log(`交易失败: 余额不足。当前余额: ${confirmedBalance}, 待处理支出: ${pendingSpent}, 可用余额: ${availableBalance}, 交易金额: ${transaction.amount}`);
       return false;
     }
 
@@ -223,6 +234,24 @@ export class Blockchain {
         if (transaction.to === address) {
           balance += transaction.amount;
         }
+      }
+    }
+    
+    return balance;
+  }
+
+  // 获取可用余额（包括待处理交易）
+  public getAvailableBalance(address: string): number {
+    // 获取已确认的余额
+    let balance = this.getBalanceOfAddress(address);
+    
+    // 减去待处理的支出
+    for (const tx of this.pendingTransactions) {
+      if (tx.from === address) {
+        balance -= tx.amount;
+      }
+      if (tx.to === address) {
+        balance += tx.amount;
       }
     }
     
