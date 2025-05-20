@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useBlockchain, Block, Transaction, createTransaction } from '../blockchain';
+import { useBlockchain, Block, Transaction, calculateBlockHash } from '../blockchain';
 
 const BlockExplorer: React.FC = () => {
   const { blockchain, isChainValid, currentWallet, refreshBalances } = useBlockchain();
@@ -52,69 +52,101 @@ const BlockExplorer: React.FC = () => {
       const currentChain = [...chain];
       const forkChain = JSON.parse(JSON.stringify(currentChain.slice(0, -1))); // 复制除最后一个区块外的所有区块
       
-      // 步骤2: 在分叉链上挖出新区块，使其比原链更长
+      // 步骤2: 在分叉链上创建新区块
       setForkProgress('2/4 - 准备在分叉上挖矿...');
       await new Promise(resolve => setTimeout(resolve, 1000)); // 仿真延迟
-
-      // 准备一个新交易，确保这个分叉链上有不同的交易
-      const transaction = {
+      
+      // 手动在分叉链上创建新区块
+      const minerAddress = currentWallet.address;
+      
+      // 在分叉上添加两个区块，使其比原链更长
+      setForkProgress('3/4 - 在分叉上创建新区块...');
+      
+      // 创建交易（自己转给自己，简单起见）
+      const transaction: Transaction = {
         id: `fork-tx-${Date.now()}`,
-        from: currentWallet.address,
-        to: currentWallet.address, // 自己转给自己，简单起见
+        from: minerAddress,
+        to: minerAddress,
         amount: 1,
         timestamp: Date.now()
       };
       
-      // 手动添加交易到内部的Blockchain实例
-      const blockchainInternal = Object.assign({}, blockchain);
-      blockchainInternal.pendingTransactions = [transaction];
-      
-      // 手动创建两个新区块，使分叉链比原链长
-      setForkProgress('3/4 - 在分叉上创建新区块...');
-      
-      // 在内部重新实现一个简单版本的挖矿函数，因为我们无法直接访问blockchain内部方法
-      const mineNewBlock = (chain: Block[], minerAddress: string, txs: Transaction[] = []) => {
-        const lastBlock = chain[chain.length - 1];
-        const newBlockData = {
-          index: lastBlock.index + 1,
-          timestamp: Date.now(),
-          transactions: [...txs, {
+      // 创建第一个新区块
+      const lastBlock = forkChain[forkChain.length - 1];
+      const newBlock1Data = {
+        index: lastBlock.index + 1,
+        timestamp: Date.now(),
+        transactions: [
+          transaction,
+          {
             id: `reward-fork-${Date.now()}`,
             from: '系统',
             to: minerAddress,
             amount: 100,
             timestamp: Date.now()
-          }],
-          previousHash: lastBlock.hash,
-          nonce: 0,
-          difficulty: lastBlock.difficulty
-        };
-        
-        // 简单计算哈希，不做工作量证明
-        let hash = '';
-        const targetPrefix = Array(newBlockData.difficulty + 1).join('0');
-        let nonce = 0;
-        
-        while(true) {
-          newBlockData.nonce = nonce;
-          const blockString = JSON.stringify(newBlockData);
-          hash = require('crypto').createHash('sha256').update(blockString).digest('hex');
-          if (hash.startsWith(targetPrefix)) break;
-          nonce++;
-        }
-        
-        const newBlock = {
-          ...newBlockData,
-          hash
-        };
-        
-        chain.push(newBlock);
-        return newBlock;
+          }
+        ],
+        previousHash: lastBlock.hash,
+        nonce: 0,
+        difficulty: lastBlock.difficulty
       };
-
-      // 在分叉链上创建两个区块，确保它比原链更长
-      mineNewBlock(forkChain, currentWallet.address, [transaction]);
-      mineNewBlock(forkChain, currentWallet.address);
+      
+      // 手动计算满足难度的哈希
+      let hash1 = '';
+      let nonce1 = 0;
+      const targetPrefix = Array(newBlock1Data.difficulty + 1).join('0');
+      
+      while(true) {
+        newBlock1Data.nonce = nonce1;
+        hash1 = calculateBlockHash(newBlock1Data);
+        if (hash1.startsWith(targetPrefix)) break;
+        nonce1++;
+        if (nonce1 > 1000) break; // 限制循环次数，避免界面卡死
+      }
+      
+      const newBlock1 = {
+        ...newBlock1Data,
+        hash: hash1
+      };
+      
+      forkChain.push(newBlock1);
+      
+      // 创建第二个新区块
+      const newBlock2Data = {
+        index: newBlock1.index + 1,
+        timestamp: Date.now(),
+        transactions: [
+          {
+            id: `reward-fork-2-${Date.now()}`,
+            from: '系统',
+            to: minerAddress,
+            amount: 100,
+            timestamp: Date.now()
+          }
+        ],
+        previousHash: newBlock1.hash,
+        nonce: 0,
+        difficulty: newBlock1.difficulty
+      };
+      
+      // 手动计算满足难度的哈希
+      let hash2 = '';
+      let nonce2 = 0;
+      
+      while(true) {
+        newBlock2Data.nonce = nonce2;
+        hash2 = calculateBlockHash(newBlock2Data);
+        if (hash2.startsWith(targetPrefix)) break;
+        nonce2++;
+        if (nonce2 > 1000) break; // 限制循环次数，避免界面卡死
+      }
+      
+      const newBlock2 = {
+        ...newBlock2Data,
+        hash: hash2
+      };
+      
+      forkChain.push(newBlock2);
       
       // 步骤3: 将分叉链添加到已知链中
       setForkProgress('4/4 - 触发最长链原则...');
