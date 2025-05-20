@@ -18,5 +18,18 @@ module.exports = function override(config) {
     }),
   ]);
 
+  // 禁用node_modules中CosmJS包的源码映射加载
+  if (config.module && config.module.rules) {
+    for (const rule of config.module.rules) {
+      if (rule.use && rule.use.some(loader => loader.loader && loader.loader.includes('source-map-loader'))) {
+        if (!rule.exclude) {
+          rule.exclude = [];
+        }
+        // 添加CosmJS包路径到排除列表
+        rule.exclude.push(/node_modules\/@cosmjs/);
+      }
+    }
+  }
+
   return config;
 };
