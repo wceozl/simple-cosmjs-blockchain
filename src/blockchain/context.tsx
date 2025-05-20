@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
 import { Blockchain } from './blockchain';
 import { Transaction } from './models';
 
@@ -34,9 +34,12 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
   const [currentWallet, setCurrentWallet] = useState<Wallet | null>(null);
   const [isMining, setIsMining] = useState<boolean>(false);
   const [miningProgress, setMiningProgress] = useState<number>(0);
+  
+  // 使用ref防止初始化创建多个钱包
+  const initialized = useRef(false);
 
   // 创建一个新钱包
-  const createWallet = useCallback(() => {
+  const createWallet = () => {
     // 简单实现：使用随机地址
     const newAddress = `wallet-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
@@ -53,7 +56,7 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     }
     
     return newWallet;
-  }, [currentWallet]);
+  };
 
   // 选择一个钱包
   const selectWallet = (address: string) => {
@@ -160,10 +163,13 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     return blockchain.isChainValid();
   };
 
-  // 初始化时创建一个默认钱包
+  // 初始化时创建一个默认钱包（仅执行一次）
   useEffect(() => {
-    createWallet();
-  }, [createWallet]);
+    if (!initialized.current) {
+      createWallet();
+      initialized.current = true;
+    }
+  }, []);
 
   // 提供上下文值
   const contextValue: BlockchainContextType = {
