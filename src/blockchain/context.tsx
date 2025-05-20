@@ -1,6 +1,6 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { Blockchain } from './blockchain';
-import { Transaction, Block } from './models';
+import { Transaction } from './models';
 
 // 钱包接口
 export interface Wallet {
@@ -36,7 +36,7 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
   const [miningProgress, setMiningProgress] = useState<number>(0);
 
   // 创建一个新钱包
-  const createWallet = () => {
+  const createWallet = useCallback(() => {
     // 简单实现：使用随机地址
     const newAddress = `wallet-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
@@ -53,7 +53,7 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     }
     
     return newWallet;
-  };
+  }, [currentWallet]);
 
   // 选择一个钱包
   const selectWallet = (address: string) => {
@@ -163,7 +163,7 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
   // 初始化时创建一个默认钱包
   useEffect(() => {
     createWallet();
-  }, []);
+  }, [createWallet]);
 
   // 提供上下文值
   const contextValue: BlockchainContextType = {
