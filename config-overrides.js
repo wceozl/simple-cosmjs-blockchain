@@ -7,6 +7,7 @@ module.exports = function override(config) {
     "stream": require.resolve("stream-browserify"),
     "zlib": require.resolve("browserify-zlib"),
     "path": require.resolve("path-browserify"),
+    "vm": require.resolve("vm-browserify"),
   });
   config.resolve.fallback = fallback;
 
