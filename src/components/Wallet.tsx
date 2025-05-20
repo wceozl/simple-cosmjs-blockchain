@@ -1,17 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBlockchain } from '../blockchain';
 
 const Wallet: React.FC = () => {
   const { 
+    blockchain,
     currentWallet, 
     wallets, 
     createWallet, 
     selectWallet, 
-    createTransaction 
+    createTransaction,
+    refreshBalances
   } = useBlockchain();
   
   const [toAddress, setToAddress] = useState<string>('');
   const [amount, setAmount] = useState<number>(0);
+
+  // 组件挂载和创建交易后刷新余额
+  useEffect(() => {
+    refreshBalances();
+    // 设置定期刷新余额（10秒一次）
+    const interval = setInterval(refreshBalances, 10000);
+    return () => clearInterval(interval);
+  }, [refreshBalances]);
 
   // 处理创建交易
   const handleTransaction = (e: React.FormEvent) => {
@@ -43,7 +53,10 @@ const Wallet: React.FC = () => {
         <div className="mb-4 p-3 border rounded bg-blue-50">
           <p className="font-semibold">当前钱包:</p>
           <p className="text-sm break-all">{currentWallet.address}</p>
-          <p className="mt-2">余额: <span className="font-bold">{currentWallet.balance}</span> 个币</p>
+          <p className="mt-2">总余额: <span className="font-bold">{currentWallet.balance}</span> 个币</p>
+          <p className="mt-1">可用余额: <span className={`font-bold ${(currentWallet.availableBalance || 0) < currentWallet.balance ? 'text-orange-600' : ''}`}>
+            {currentWallet.availableBalance !== undefined ? currentWallet.availableBalance : currentWallet.balance}
+          </span> 个币 {(currentWallet.availableBalance !== undefined && currentWallet.availableBalance < currentWallet.balance) ? '(部分资金处于待确认状态)' : ''}</p>
         </div>
       ) : (
         <div className="mb-4 p-3 border rounded bg-yellow-50">
@@ -71,6 +84,9 @@ const Wallet: React.FC = () => {
               >
                 <p className="text-xs break-all">{wallet.address}</p>
                 <p className="text-sm">余额: {wallet.balance} 个币</p>
+                {wallet.availableBalance !== undefined && wallet.availableBalance !== wallet.balance && (
+                  <p className="text-xs text-orange-600">可用: {wallet.availableBalance} 个币</p>
+                )}
               </div>
             ))}
           </div>
@@ -83,6 +99,16 @@ const Wallet: React.FC = () => {
           创建新钱包
         </button>
       </div>
+      
+      {/* 待处理交易信息 */}
+      {currentWallet && (
+        <div className="mb-4 p-3 border rounded bg-gray-50">
+          <h3 className="font-semibold mb-1">待处理交易:</h3>
+          <p className="text-sm">
+            {blockchain.getPendingTransactions().filter(tx => tx.from === currentWallet.address || tx.to === currentWallet.address).length} 笔与当前钱包相关的交易待确认
+          </p>
+        </div>
+      )}
       
       {/* 发送交易表单 */}
       <div className="border-t pt-4">
@@ -116,9 +142,9 @@ const Wallet: React.FC = () => {
           
           <button
             type="submit"
-            disabled={!currentWallet}
+            disabled={!currentWallet || (currentWallet.availableBalance !== undefined && currentWallet.availableBalance <= 0)}
             className={`w-full px-4 py-2 ${
-              currentWallet 
+              currentWallet && (currentWallet.availableBalance === undefined || currentWallet.availableBalance > 0)
                 ? 'bg-green-500 hover:bg-green-600' 
                 : 'bg-gray-300 cursor-not-allowed'
             } text-white rounded`}
