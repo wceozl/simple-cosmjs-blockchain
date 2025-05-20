@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useRef, useCallback } from 'react';
 import { Blockchain } from './blockchain';
 import { Transaction } from './models';
 
@@ -39,8 +39,8 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
   // 使用ref防止初始化创建多个钱包
   const initialized = useRef(false);
 
-  // 创建一个新钱包
-  const createWallet = () => {
+  // 创建一个新钱包 - 使用useCallback包装以解决ESLint警告
+  const createWallet = useCallback(() => {
     // 简单实现：使用随机地址
     const newAddress = `wallet-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
@@ -53,12 +53,10 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     setWallets(prev => [...prev, newWallet]);
     
     // 如果没有选择钱包，自动选择新创建的钱包
-    if (!currentWallet) {
-      setCurrentWallet(newWallet);
-    }
+    setCurrentWallet(current => current || newWallet);
     
     return newWallet;
-  };
+  }, []);  // 空依赖数组，因为这个函数不依赖于任何状态
 
   // 选择一个钱包
   const selectWallet = (address: string) => {
@@ -67,7 +65,7 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // 刷新所有钱包余额
-  const refreshBalances = () => {
+  const refreshBalances = useCallback(() => {
     const updatedWallets = wallets.map(wallet => {
       const confirmedBalance = blockchain.getBalanceOfAddress(wallet.address);
       const availableBalance = blockchain.getAvailableBalance(wallet.address);
@@ -86,10 +84,10 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
       const updatedCurrentWallet = updatedWallets.find(w => w.address === currentWallet.address) || null;
       setCurrentWallet(updatedCurrentWallet);
     }
-  };
+  }, [blockchain, wallets, currentWallet]);
 
   // 创建交易
-  const createTransaction = (to: string, amount: number): boolean => {
+  const createTransaction = useCallback((to: string, amount: number): boolean => {
     if (!currentWallet) {
       alert('请先选择一个钱包');
       return false;
@@ -116,10 +114,10 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     }
     
     return success;
-  };
+  }, [blockchain, currentWallet, refreshBalances]);
 
   // 开始挖矿
-  const startMining = async () => {
+  const startMining = useCallback(async () => {
     if (!currentWallet) {
       alert('请先选择一个钱包');
       return;
@@ -166,12 +164,12 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
       setMiningProgress(0);
       alert(`挖矿出错: ${error}`);
     }
-  };
+  }, [blockchain, currentWallet, isMining, refreshBalances]);
 
   // 验证区块链是否有效
-  const isChainValid = (): boolean => {
+  const isChainValid = useCallback((): boolean => {
     return blockchain.isChainValid();
-  };
+  }, [blockchain]);
 
   // 初始化时创建一个默认钱包（仅执行一次）
   useEffect(() => {
@@ -179,7 +177,7 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
       createWallet();
       initialized.current = true;
     }
-  }, []);
+  }, [createWallet]); // 添加createWallet作为依赖
 
   // 提供上下文值
   const contextValue: BlockchainContextType = {
